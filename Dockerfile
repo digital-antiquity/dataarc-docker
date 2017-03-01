@@ -94,10 +94,11 @@ WORKDIR /data
 # Define commonly used JAVA_HOME variable
 ENV JAVA_HOME /usr/lib/jvm/java-8-oracle
 
-# CMD /usr/sbin/service postgresql start
-# CMD /usr/sbin/service mongodb start
-CMD ["/usr/sbin/service","postgresql", "start"]
-CMD ["/usr/sbin/service","mongodb", "start"]
-ENTRYPOINT ["/bin/sh", "-c", "while true; do sleep 1; done"]
+RUN echo '/usr/sbin/service postgresql start' >> /start.sh \
+    && echo '/usr/sbin/service mongodb start' >> /start.sh \ 
+    && echo 'while true; do sleep 1; done' >> /start.sh \
+    && chmod 755 /start.sh
+
+ENTRYPOINT ["/bin/sh", "-c", "/start.sh"]
 
 # CMD mongod
