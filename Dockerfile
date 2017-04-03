@@ -40,7 +40,7 @@ RUN touch /etc/apt/sources.list.d/pgdg.list \
     && echo "deb http://apt.postgresql.org/pub/repos/apt/ xenial-pgdg main" >> /etc/apt/sources.list.d/pgdg.list \
     && wget --no-check-certificate  --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
     && apt-get update &&  apt-get install \
-    && apt-get install -y --no-install-recommends postgresql-9.6 postgresql-client-9.6 postgis
+    && apt-get install -y --no-install-recommends postgresql-9.6 postgresql-client-9.6 postgis postgresql-9.6-postgis-2.3 postgresql-contrib-9.6 postgresql-9.6-postgis-2.3-scripts
 
 
 
@@ -91,14 +91,46 @@ VOLUME /data/db /data/configdb
 # Define working directory.
 WORKDIR /data
 
+
+VOLUME /dataarc
+
 # Define commonly used JAVA_HOME variable
 ENV JAVA_HOME /usr/lib/jvm/java-8-oracle
 
-RUN echo '/usr/sbin/service postgresql start' >> /start.sh \
-    && echo '/usr/sbin/service mongodb start' >> /start.sh \ 
-    && echo 'while true; do sleep 1; done' >> /start.sh \
-    && chmod 755 /start.sh
+
+##### MAVEN
+
+ARG MAVEN_VERSION=3.5.0-alpha-1
+ARG USER_HOME_DIR="/root"
+ARG SHA1=a677b8398313325d6c266279cb8d385bbc9d435d
+ARG BASE_URL=https://apache.osuosl.org/maven/maven-3/${MAVEN_VERSION}/binaries
+
+
+
+RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
+  && wget -O /tmp/apache-maven.tar.gz "${BASE_URL}/apache-maven-$MAVEN_VERSION-bin.tar.gz" \
+  && echo "${SHA1}  /tmp/apache-maven.tar.gz" | sha1sum -c - \
+  && tar -xzf /tmp/apache-maven.tar.gz -C /usr/share/maven --strip-components=1 \
+  && rm -f /tmp/apache-maven.tar.gz \
+  && ln -s /usr/share/maven/bin/mvn /usr/bin/mvn
+
+ENV MAVEN_HOME /usr/share/maven
+ENV MAVEN_CONFIG "$USER_HOME_DIR/.m2"
+
+VOLUME "$USER_HOME_DIR/.m2"
+
+COPY pg_hba.conf /etc/postgresql/9.6/main/pg_hba.conf
+RUN chown postgres:postgres /etc/postgresql/9.6/main/pg_hba.conf
+USER postgres
+COPY pg-start.sh /pg-start.sh
+RUN sh /pg-start.sh
+USER root
+COPY mg-start.sh /mg-start.sh
+RUN sh /mg-start.sh
+# RUN chmod 755 /start.sh
+COPY start.sh /start.sh
 
 ENTRYPOINT ["/bin/sh", "-c", "/start.sh"]
+EXPOSE 8280
 
 # CMD mongod
